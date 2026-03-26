@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poli Alert IG Post Generator</title>
+<link rel="stylesheet" href="https://use.typekit.net/nkd0qxj.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue: #374183;
+    --red: #b72a30;
+    --black: #1a1a1a;
+    --mid: #2a2a2a;
+    --border: #3a3a3a;
+    --text: #f0f0f0;
+    --muted: #888;
+  }
+
+  body {
+    background: var(--black);
+    color: var(--text);
+    font-family: 'bebas-neue-pro', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 60px;
+  }
+
+  header { text-align: center; margin-bottom: 40px; }
+  header .brand { font-family: 'bebas-neue-pro', sans-serif; font-size: 13px; letter-spacing: 6px; color: var(--blue); margin-bottom: 8px; }
+  header h1 { font-family: 'bebas-neue-pro', sans-serif; font-size: 42px; font-weight: 400; text-transform: uppercase; color: #fff; letter-spacing: 3px; }
+  header p { color: var(--muted); font-size: 13px; margin-top: 8px; font-family: sans-serif; }
+
+  .card { background: var(--mid); border: 1px solid var(--border); border-radius: 12px; padding: 28px; width: 100%; max-width: 560px; margin-bottom: 24px; }
+  .card > label, .section-title { display: block; font-size: 14px; font-weight: 400; letter-spacing: 4px; text-transform: uppercase; color: var(--blue); margin-bottom: 12px; font-family: 'bebas-neue-pro', sans-serif; }
+
+  .url-row { display: flex; gap: 10px; }
+
+  input[type="text"], textarea {
+    background: var(--black); border: 1px solid var(--border); border-radius: 8px;
+    color: #fff; font-family: sans-serif; font-size: 13px;
+    padding: 12px 16px; outline: none; transition: border-color 0.2s; width: 100%;
+  }
+  input[type="text"] { width: auto; flex: 1; }
+  input[type="text"]:focus, textarea:focus { border-color: var(--blue); }
+  input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
+  textarea { resize: vertical; min-height: 80px; }
+
+  button {
+    background: var(--blue); border: none; border-radius: 8px; color: #fff;
+    cursor: pointer; font-family: 'bebas-neue-pro', sans-serif; font-size: 18px;
+    font-weight: 400; letter-spacing: 2px; padding: 12px 20px; text-transform: uppercase;
+    transition: opacity 0.2s, transform 0.1s; white-space: nowrap;
+  }
+  button:hover { opacity: 0.85; }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); font-size: 14px; padding: 8px 14px; font-family: 'bebas-neue-pro', sans-serif; }
+  .btn-secondary:hover { border-color: var(--blue); color: var(--blue); }
+
+  .fields { display: flex; flex-direction: column; gap: 16px; }
+  .field-group { display: flex; flex-direction: column; gap: 6px; }
+  .field-group > label { font-size: 11px; letter-spacing: 2px; color: var(--muted); font-weight: 600; font-family: sans-serif; }
+
+  .img-controls { display: flex; gap: 12px; align-items: flex-start; }
+  .img-thumb-box { width: 72px; height: 72px; border-radius: 8px; border: 1px solid var(--border); background: var(--black); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 24px; flex-shrink: 0; overflow: hidden; }
+  .img-thumb-box img { width: 100%; height: 100%; object-fit: cover; }
+
+  .status { font-size: 12px; padding: 10px 14px; border-radius: 6px; margin-top: 10px; display: none; line-height: 1.6; font-family: sans-serif; }
+  .status.info  { background: #001a4d; color: #6699ff; border: 1px solid #003080; display: block; }
+  .status.error { background: #2a0a0a; color: #ff6b6b; border: 1px solid #4a1a1a; display: block; }
+  .status.warn  { background: #2a1e00; color: #ffcc44; border: 1px solid #4a3800; display: block; }
+
+  .preview-section { width: 100%; max-width: 560px; }
+  .preview-label { font-size: 14px; font-weight: 400; letter-spacing: 4px; color: var(--blue); text-transform: uppercase; margin-bottom: 16px; text-align: center; font-family: 'bebas-neue-pro', sans-serif; }
+
+  #ig-post {
+    position: relative; width: 100%; max-width: 480px; aspect-ratio: 4 / 5;
+    overflow: hidden; background: #a2a0a6; border-radius: 8px; margin: 0 auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  #post-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  #post-gradient { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0) 60%, rgba(0,0,0,0.75) 72%, rgba(0,0,0,1) 82%, rgba(0,0,0,1) 100%); }
+  #post-logo { position: absolute; top: 3%; left: 3%; width: 18%; max-width: 90px; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5)); }
+  #post-text { position: absolute; bottom: 0; left: 0; right: 0; padding: 0 6% 3%; text-align: center; }
+  #post-byline { font-family: 'bebas-neue-pro', sans-serif; font-weight: 400; font-size: clamp(10px, 2.2vw, 15px); letter-spacing: 0.3em; color: #fff; text-transform: uppercase; margin-bottom: 4px; opacity: 0.9; }
+  #post-headline { font-family: 'bebas-neue-pro', sans-serif; font-weight: 400; font-size: clamp(22px, 6vw, 42px); line-height: 1.05; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,0.8); letter-spacing: 0.02em; }
+
+  .download-row { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
+  .btn-download { background: var(--blue); color: #fff; font-size: 16px; padding: 12px 28px; border-radius: 8px; font-family: 'bebas-neue-pro', sans-serif; letter-spacing: 2px; }
+
+  #export-canvas { display: none; }
+
+  .spinner { width: 15px; height: 15px; border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .upload-label {
+    display: inline-block; cursor: pointer; padding: 8px 14px;
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; font-family: 'bebas-neue-pro', sans-serif;
+    font-weight: 400; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--text); background: transparent; transition: all 0.2s;
+  }
+  .upload-label:hover { border-color: var(--blue); color: var(--blue); }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; font-family: sans-serif; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Poli Alert</div>
+  <h1>IG Post Generator</h1>
+  <p>Paste a story URL → get a ready-to-post image</p>
+</header>
+
+<div class="card">
+  <label>Step 1 — Paste Story URL</label>
+  <div class="url-row">
+    <input type="text" id="url-input" placeholder="https://polialert.com/..." />
+    <button id="fetch-btn" onclick="fetchStory()">Fetch</button>
+    <button class="btn-secondary" onclick="doManually()" style="white-space:nowrap">Do Manually</button>
+  </div>
+  <div class="status" id="fetch-status"></div>
+</div>
+
+<div class="card" id="edit-card" style="display:none">
+  <div class="section-title">Step 2 — Review & Edit</div>
+  <div class="fields">
+    <div class="field-group">
+      <label>Headline</label>
+      <textarea id="headline-input" oninput="updatePreview()" placeholder="Headline will appear here..."></textarea>
+    </div>
+    <div class="field-group">
+      <label>Article Image</label>
+      <div class="img-controls">
+        <div class="img-thumb-box" id="img-thumb-box">🖼</div>
+        <div>
+          <div style="font-size:12px; color:var(--muted); margin-bottom:8px; font-family:sans-serif" id="img-status-text">Loading image...</div>
+          <label class="upload-label">
+            Replace Image
+            <input type="file" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
+          </label>
+          <p class="hint">Image is pulled automatically.<br>Use this only if you want a different photo.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="preview-section" id="preview-section" style="display:none">
+  <div class="preview-label">Step 3 — Preview & Download</div>
+  <div id="ig-post">
+    <img id="post-bg" src="" alt="" crossorigin="anonymous" />
+    <div id="post-gradient"></div>
+    <img id="post-logo" src="polialert_logo.png" alt="Poli Alert" crossorigin="anonymous" />
+    <div id="post-text">
+      <div id="post-byline">-POLI ALERT-</div>
+      <div id="post-headline">Headline goes here</div>
+    </div>
+  </div>
+  <div class="download-row">
+    <button class="btn-download" onclick="downloadImage()">⬇ Download Post</button>
+    <button class="btn-secondary" onclick="resetAll()">Start Over</button>
+  </div>
+</div>
+
+<canvas id="export-canvas"></canvas>
+
+<script>
+async function fetchStory() {
+  const url = document.getElementById('url-input').value.trim();
+  if (!url) return;
+  const btn = document.getElementById('fetch-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Fetching...';
+  setStatus('info', 'Fetching article...');
+  try {
+    const res = await fetch('/api/fetch-article?url=' + encodeURIComponent(url));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch article');
+    document.getElementById('headline-input').value = data.headline;
+    updatePreview();
+    showEditAndPreview();
+    if (data.imageBase64) {
+      setImage(data.imageBase64);
+      document.getElementById('img-status-text').textContent = 'Image loaded ✓';
+      setStatus('info', '✓ Done! Edit headline if needed, then download.');
+    } else {
+      document.getElementById('img-status-text').textContent = 'Image not available — upload manually';
+      setStatus('warn', '⚠ Headline loaded but image could not be fetched. Please upload the image.');
+    }
+  } catch (err) {
+    console.error(err);
+    showEditAndPreview();
+    setStatus('error', '⚠ ' + (err.message || 'Could not fetch article. Try again or fill in manually.'));
+    document.getElementById('img-status-text').textContent = 'Upload image manually';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Fetch';
+}
+
+function doManually() {
+  document.getElementById('headline-input').value = '';
+  document.getElementById('post-headline').textContent = 'Headline goes here';
+  document.getElementById('post-bg').src = '';
+  document.getElementById('img-thumb-box').innerHTML = '🖼';
+  document.getElementById('img-status-text').textContent = 'Upload your image below';
+  document.getElementById('fetch-status').className = 'status';
+  showEditAndPreview();
+}
+
+function setImage(src) {
+  document.getElementById('post-bg').src = src;
+  const box = document.getElementById('img-thumb-box');
+  box.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = src;
+  box.appendChild(img);
+}
+
+function handleImageUpload(input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    setImage(e.target.result);
+    document.getElementById('img-status-text').textContent = input.files[0].name + ' ✓';
+    showEditAndPreview();
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function updatePreview() {
+  const h = document.getElementById('headline-input').value.trim();
+  document.getElementById('post-headline').textContent = h || 'Headline goes here';
+}
+
+function showEditAndPreview() {
+  document.getElementById('edit-card').style.display = 'block';
+  document.getElementById('preview-section').style.display = 'block';
+}
+
+async function downloadImage() {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Generating...';
+  try {
+    const canvas = document.getElementById('export-canvas');
+    const W = 1080, H = 1350;
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    await document.fonts.ready;
+    const bg = document.getElementById('post-bg');
+    if (bg.src && bg.complete && bg.naturalWidth > 0) {
+      const r = bg.naturalWidth / bg.naturalHeight;
+      let dw, dh, dx, dy;
+      if (r > 1) { dh = H; dw = H * r; dx = (W - dw) / 2; dy = 0; }
+      else { dw = W; dh = W / r; dx = 0; dy = (H - dh) / 2; }
+      ctx.drawImage(bg, dx, dy, dw, dh);
+    } else {
+      ctx.fillStyle = '#a2a0a6'; ctx.fillRect(0, 0, W, H);
+    }
+    const g = ctx.createLinearGradient(0, H * 0.60, 0, H);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(0.30, 'rgba(0,0,0,0.75)');
+    g.addColorStop(0.55, 'rgba(0,0,0,1)');
+    g.addColorStop(1, 'rgba(0,0,0,1)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const headline = document.getElementById('headline-input').value.trim() || 'Headline';
+    const padX = W * 0.06, maxW = W - padX * 2;
+    function wrap(text, size) {
+      ctx.font = '400 ' + size + 'px bebas-neue-pro, sans-serif';
+      const words = text.split(' ');
+      const lines = []; let line = '';
+      for (const w of words) {
+        const t = line ? line + ' ' + w : w;
+        if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; }
+        else line = t;
+      }
+      if (line) lines.push(line);
+      return lines;
+    }
+    let fs = 112, lines;
+    while (fs > 44) { lines = wrap(headline, fs); if (lines.length <= 3) break; fs -= 6; }
+    const lh = fs * 1.1, bh = 30, gap = 16, pad = H * 0.04;
+    const blockH = bh + gap + lines.length * lh;
+    let y = H - pad - blockH;
+    ctx.font = '400 ' + bh + 'px bebas-neue-pro, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.textAlign = 'center';
+    ctx.fillText('-POLI ALERT-', W / 2, y + bh);
+    ctx.font = '400 ' + fs + 'px bebas-neue-pro, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    let hy = y + bh + gap;
+    for (const ln of lines) { ctx.fillText(ln, W / 2, hy + fs * 0.85); hy += lh; }
+    const logoImg = document.getElementById('post-logo');
+    if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
+      const L = W * 0.18;
+      ctx.drawImage(logoImg, W * 0.03, W * 0.03, L, L);
+    }
+    canvas.toBlob(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      const slug = (document.getElementById('headline-input').value || 'post')
+        .substring(0, 30).replace(/\s+/g, '-').replace(/[^a-z0-9-]/gi, '').toLowerCase();
+      a.download = 'poli-alert-' + slug + '.png';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }, 'image/png');
+  } catch (err) {
+    alert('Download failed: ' + err.message);
+  }
+  btn.disabled = false;
+  btn.textContent = '⬇ Download Post';
+}
+
+function setStatus(type, msg) {
+  const el = document.getElementById('fetch-status');
+  el.className = 'status ' + type;
+  el.textContent = msg;
+}
+
+function resetAll() {
+  document.getElementById('url-input').value = '';
+  document.getElementById('fetch-status').className = 'status';
+  document.getElementById('edit-card').style.display = 'none';
+  document.getElementById('preview-section').style.display = 'none';
+  document.getElementById('headline-input').value = '';
+  document.getElementById('post-bg').src = '';
+  document.getElementById('post-headline').textContent = 'Headline goes here';
+  document.getElementById('img-thumb-box').innerHTML = '🖼';
+  document.getElementById('img-status-text').textContent = 'Loading image...';
+}
+
+document.getElementById('url-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') fetchStory();
+});
+</script>
+</body>
+</html>
