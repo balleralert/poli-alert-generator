@@ -83,12 +83,7 @@
     overflow: hidden; background: #a2a0a6; border-radius: 8px; margin: 0 auto;
     box-shadow: 0 20px 60px rgba(0,0,0,0.6);
   }
-  #post-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  #post-gradient { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0) 60%, rgba(0,0,0,0.75) 72%, rgba(0,0,0,1) 82%, rgba(0,0,0,1) 100%); }
-  #post-logo { position: absolute; top: 3%; left: 3%; width: 18%; max-width: 90px; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5)); }
-  #post-text { position: absolute; bottom: 0; left: 0; right: 0; padding: 0 6% 3%; text-align: center; }
-  #post-byline { font-family: 'bebas-neue-pro', sans-serif; font-weight: 400; font-size: clamp(10px, 2.2vw, 15px); letter-spacing: 0.3em; color: #fff; text-transform: uppercase; margin-bottom: 4px; opacity: 0.9; }
-  #post-headline { font-family: 'bebas-neue-pro', sans-serif; font-weight: 400; font-size: clamp(22px, 6vw, 42px); line-height: 1.05; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,0.8); letter-spacing: 0.02em; }
+  #preview-canvas { display: block; width: 100%; height: 100%; }
 
   .download-row { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
   .btn-download { background: var(--blue); color: #fff; font-size: 16px; padding: 12px 28px; border-radius: 8px; font-family: 'bebas-neue-pro', sans-serif; letter-spacing: 2px; }
@@ -154,16 +149,10 @@
 <div class="preview-section" id="preview-section" style="display:none">
   <div class="preview-label">Step 3 — Preview & Download</div>
   <div id="ig-post">
-    <img id="post-bg" src="" alt="" crossorigin="anonymous" />
-    <div id="post-gradient"></div>
-    <img id="post-logo" src="polialert_logo_final.png" alt="Poli Alert" crossorigin="anonymous" />
-    <div id="post-text">
-      <div id="post-byline">-POLI ALERT-</div>
-      <div id="post-headline">Headline goes here</div>
-    </div>
+    <canvas id="preview-canvas" width="1080" height="1350"></canvas>
   </div>
   <div class="download-row">
-    <button class="btn-download" onclick="downloadImage()">⬇ Download Post</button>
+    <button class="btn-download" onclick="downloadImage(event)">⬇ Download Post</button>
     <button class="btn-secondary" onclick="resetAll()">Start Over</button>
   </div>
 </div>
@@ -171,6 +160,92 @@
 <canvas id="export-canvas"></canvas>
 
 <script>
+// ===== LOCKED LAYOUT (1080 x 1350). Every post uses these exact positions. =====
+const W = 1080, H = 1350;
+const TEXT_TOP   = 925;   // top of the "-POLI ALERT-" tag, same spot on every post
+const BYLINE_SIZE = 30;
+const BYLINE_GAP  = 14;   // space between tag and headline
+const HEAD_SIZE   = 104;  // used only to preload the font
+const BOTTOM_PAD  = 45;   // bottom margin; the headline fills everything between the tag and here
+const MAX_HEAD    = 230;  // biggest a headline can get
+const MIN_HEAD    = 50;   // smallest a headline can get
+const LINE_H      = 1.02;
+const PAD_X       = W * 0.06;
+
+const bgImg = new Image();
+const logoImg = new Image();
+logoImg.src = 'polialert_logo_final.png';
+logoImg.onload = () => renderPost();
+
+async function renderPost(target) {
+  const canvas = target || document.getElementById('preview-canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  try { await document.fonts.load('400 ' + HEAD_SIZE + 'px "bebas-neue-pro"'); } catch (e) {}
+
+  // Background, cover crop
+  if (bgImg.src && bgImg.complete && bgImg.naturalWidth > 0) {
+    const r = bgImg.naturalWidth / bgImg.naturalHeight, cr = W / H;
+    let dw, dh;
+    if (r > cr) { dh = H; dw = H * r; } else { dw = W; dh = W / r; }
+    ctx.drawImage(bgImg, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  } else {
+    ctx.fillStyle = '#a2a0a6'; ctx.fillRect(0, 0, W, H);
+  }
+
+  // Gradient, darkens behind the fixed text area
+  const g = ctx.createLinearGradient(0, H * 0.52, 0, H);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(0.30, 'rgba(0,0,0,0.80)');
+  g.addColorStop(0.50, 'rgba(0,0,0,1)');
+  g.addColorStop(1, 'rgba(0,0,0,1)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  const headline = (document.getElementById('headline-input').value || '').trim() || 'Headline goes here';
+  const maxW = W - PAD_X * 2;
+  function wrap(text, size) {
+    ctx.font = '400 ' + size + 'px "bebas-neue-pro", sans-serif';
+    const words = text.split(/\s+/);
+    const lines = []; let line = '';
+    for (const w of words) {
+      const t = line ? line + ' ' + w : w;
+      if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; }
+      else line = t;
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  // Headline fills the whole black area under the tag: largest size that fits
+  const boxTop = TEXT_TOP + BYLINE_SIZE + BYLINE_GAP;
+  const boxH = H - BOTTOM_PAD - boxTop;
+  let fs = MAX_HEAD, lines = wrap(headline, fs);
+  const tooWide = () => lines.some(l => ctx.measureText(l).width > maxW);
+  while (fs > MIN_HEAD && (lines.length * fs * LINE_H > boxH || tooWide())) { fs -= 2; lines = wrap(headline, fs); }
+
+  // Tag, fixed position
+  ctx.textAlign = 'center';
+  ctx.font = '400 ' + BYLINE_SIZE + 'px "bebas-neue-pro", sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillText('-POLI ALERT-', W / 2, TEXT_TOP + BYLINE_SIZE);
+
+  // Headline, fills the space from under the tag to the bottom
+  ctx.font = '400 ' + fs + 'px "bebas-neue-pro", sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 2;
+  const lh = fs * LINE_H;
+  let y = boxTop + (boxH - lines.length * lh) / 2;
+  for (const ln of lines) { ctx.fillText(ln, W / 2, y + fs * 0.85); y += lh; }
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+  // Logo
+  if (logoImg.complete && logoImg.naturalWidth > 0) {
+    const L = W * 0.18;
+    ctx.drawImage(logoImg, W * 0.03, W * 0.03, L, L * logoImg.naturalHeight / logoImg.naturalWidth);
+  }
+  return canvas;
+}
+
 async function fetchStory() {
   const url = document.getElementById('url-input').value.trim();
   if (!url) return;
@@ -183,14 +258,14 @@ async function fetchStory() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to fetch article');
     document.getElementById('headline-input').value = data.headline;
-    updatePreview();
     showEditAndPreview();
+    updatePreview();
     if (data.imageBase64) {
       setImage(data.imageBase64);
       document.getElementById('img-status-text').textContent = 'Image loaded ✓';
       setStatus('info', '✓ Done! Edit headline if needed, then download.');
     } else {
-      document.getElementById('img-status-text').textContent = 'Image not available — upload manually';
+      document.getElementById('img-status-text').textContent = 'Image not available, upload manually';
       setStatus('warn', '⚠ Headline loaded but image could not be fetched. Please upload the image.');
     }
   } catch (err) {
@@ -205,16 +280,17 @@ async function fetchStory() {
 
 function doManually() {
   document.getElementById('headline-input').value = '';
-  document.getElementById('post-headline').textContent = 'Headline goes here';
-  document.getElementById('post-bg').src = '';
+  bgImg.removeAttribute('src');
   document.getElementById('img-thumb-box').innerHTML = '🖼';
   document.getElementById('img-status-text').textContent = 'Upload your image below';
   document.getElementById('fetch-status').className = 'status';
   showEditAndPreview();
+  updatePreview();
 }
 
 function setImage(src) {
-  document.getElementById('post-bg').src = src;
+  bgImg.onload = () => renderPost();
+  bgImg.src = src;
   const box = document.getElementById('img-thumb-box');
   box.innerHTML = '';
   const img = document.createElement('img');
@@ -233,75 +309,19 @@ function handleImageUpload(input) {
   reader.readAsDataURL(input.files[0]);
 }
 
-function updatePreview() {
-  const h = document.getElementById('headline-input').value.trim();
-  document.getElementById('post-headline').textContent = h || 'Headline goes here';
-}
+function updatePreview() { renderPost(); }
 
 function showEditAndPreview() {
   document.getElementById('edit-card').style.display = 'block';
   document.getElementById('preview-section').style.display = 'block';
 }
 
-async function downloadImage() {
-  const btn = event.target;
+async function downloadImage(e) {
+  const btn = e.currentTarget;
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Generating...';
   try {
-    const canvas = document.getElementById('export-canvas');
-    const W = 1080, H = 1350;
-    canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext('2d');
-    await document.fonts.ready;
-    const bg = document.getElementById('post-bg');
-    if (bg.src && bg.complete && bg.naturalWidth > 0) {
-      const r = bg.naturalWidth / bg.naturalHeight;
-      let dw, dh, dx, dy;
-      if (r > 1) { dh = H; dw = H * r; dx = (W - dw) / 2; dy = 0; }
-      else { dw = W; dh = W / r; dx = 0; dy = (H - dh) / 2; }
-      ctx.drawImage(bg, dx, dy, dw, dh);
-    } else {
-      ctx.fillStyle = '#a2a0a6'; ctx.fillRect(0, 0, W, H);
-    }
-    const g = ctx.createLinearGradient(0, H * 0.60, 0, H);
-    g.addColorStop(0, 'rgba(0,0,0,0)');
-    g.addColorStop(0.30, 'rgba(0,0,0,0.75)');
-    g.addColorStop(0.55, 'rgba(0,0,0,1)');
-    g.addColorStop(1, 'rgba(0,0,0,1)');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    const headline = document.getElementById('headline-input').value.trim() || 'Headline';
-    const padX = W * 0.06, maxW = W - padX * 2;
-    function wrap(text, size) {
-      ctx.font = '400 ' + size + 'px bebas-neue-pro, sans-serif';
-      const words = text.split(' ');
-      const lines = []; let line = '';
-      for (const w of words) {
-        const t = line ? line + ' ' + w : w;
-        if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; }
-        else line = t;
-      }
-      if (line) lines.push(line);
-      return lines;
-    }
-    let fs = 112, lines;
-    while (fs > 44) { lines = wrap(headline, fs); if (lines.length <= 3) break; fs -= 6; }
-    const lh = fs * 1.1, bh = 30, gap = 16, pad = H * 0.04;
-    const blockH = bh + gap + lines.length * lh;
-    let y = H - pad - blockH;
-    ctx.font = '400 ' + bh + 'px bebas-neue-pro, sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.textAlign = 'center';
-    ctx.fillText('-POLI ALERT-', W / 2, y + bh);
-    ctx.font = '400 ' + fs + 'px bebas-neue-pro, sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'center';
-    let hy = y + bh + gap;
-    for (const ln of lines) { ctx.fillText(ln, W / 2, hy + fs * 0.85); hy += lh; }
-    const logoImg = document.getElementById('post-logo');
-    if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
-      const L = W * 0.18;
-      ctx.drawImage(logoImg, W * 0.03, W * 0.03, L, L);
-    }
+    const canvas = await renderPost(document.getElementById('export-canvas'));
     canvas.toBlob(blob => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -309,7 +329,7 @@ async function downloadImage() {
         .substring(0, 30).replace(/\s+/g, '-').replace(/[^a-z0-9-]/gi, '').toLowerCase();
       a.download = 'poli-alert-' + slug + '.png';
       a.click();
-      URL.revokeObjectURL(a.href);
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }, 'image/png');
   } catch (err) {
     alert('Download failed: ' + err.message);
@@ -330,8 +350,7 @@ function resetAll() {
   document.getElementById('edit-card').style.display = 'none';
   document.getElementById('preview-section').style.display = 'none';
   document.getElementById('headline-input').value = '';
-  document.getElementById('post-bg').src = '';
-  document.getElementById('post-headline').textContent = 'Headline goes here';
+  bgImg.removeAttribute('src');
   document.getElementById('img-thumb-box').innerHTML = '🖼';
   document.getElementById('img-status-text').textContent = 'Loading image...';
 }
